@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">NumBits</string>
+    <string name="instructions">Drag the numbers into the boxes above to make the equation true.</string>
+    <string name="congrats">Congrats!</string>
+    <string name="not_quite">Not quite. Keep trying!</string>
+    <string name="reset">Reset</string>
+    <string name="finish_time">You finished the puzzle in %s</string>
+    <string name="share_text">NumBits #%1$d %2$s 🎲\n%3$s</string>
+    <string name="sharing_not_available">Sharing Not Available</string>
+    <string name="come_back_tomorrow">Come back tomorrow for new puzzles.</string>
+    <string name="play_next_puzzle">Play Next Puzzle</string>
+    <string name="share_results">Share Results</string>
+</resources>
