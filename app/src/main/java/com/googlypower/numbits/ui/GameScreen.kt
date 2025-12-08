@@ -263,7 +263,10 @@ fun GameLayout(
 
     Card(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(largePadding),
@@ -562,7 +565,7 @@ private fun shareSolvedPuzzle(
 
     try {
         intentContext.startActivity(shareIntent, null)
-    } catch (e: ActivityNotFoundException) {
+    } catch (_: ActivityNotFoundException) {
         Toast.makeText(
             intentContext,
             intentContext.getString(R.string.sharing_not_available),

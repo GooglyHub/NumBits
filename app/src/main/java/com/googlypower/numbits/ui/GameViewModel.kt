@@ -1,5 +1,6 @@
 package com.googlypower.numbits.ui
 
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
@@ -12,7 +13,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.time.LocalDate
-import java.time.Period
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -20,6 +20,7 @@ import androidx.lifecycle.viewModelScope
 import com.googlypower.numbits.data.SavedProgress
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.temporal.ChronoUnit
 
 
 class GameViewModel(
@@ -36,8 +37,8 @@ class GameViewModel(
 
     init {
         val base = LocalDate.of(2025, 11, 15)
-        val period = Period.between(base, today)
-        gameId = period.days
+        val daysBetween = base.until(today, ChronoUnit.DAYS)
+        gameId = daysBetween.toInt()
 
         determineWhichPuzzleToShow()
     }
@@ -79,67 +80,6 @@ class GameViewModel(
             }
         }
         return s.toString()
-    }
-
-    fun precedence(op: Char) : Int {
-        if (op == '+' || op == '-') {
-            return 0
-        }
-        if (op == '*') {
-            return 1
-        }
-        return 0
-    }
-
-    fun compute(a: Int, b: Int, op: Char) : Int {
-        if (op == '+') {
-            return a + b
-        }
-        if (op == '-') {
-            return a - b
-        }
-        if (op == '*') {
-            return a * b
-        }
-        return 0
-    }
-
-    fun evaluate(expression: String) : Int {
-        val postfix : MutableList<Any> = mutableListOf()
-        val opStack = ArrayDeque<Char>()
-        var curr = 0
-        for (ch in expression) {
-            if (ch.isDigit()) {
-                curr = 10 * curr + (ch - '0')
-            } else {
-                if (curr > 0) {
-                    postfix.add(curr)
-                }
-                curr = 0
-                while (opStack.isNotEmpty() && precedence(ch) <= precedence(opStack.first())) {
-                    postfix.add(opStack.removeFirst())
-                }
-                opStack.addFirst(ch)
-            }
-        }
-        if (curr > 0) {
-            postfix.add(curr)
-        }
-        while (opStack.isNotEmpty()) {
-            postfix.add(opStack.removeFirst())
-        }
-
-        val evalStack = ArrayDeque<Int>()
-        for (x in postfix) {
-            if (x is Int) {
-                evalStack.addFirst(x)
-            } else {
-                val second = evalStack.removeFirst()
-                val first = evalStack.removeFirst()
-                evalStack.addFirst(compute(first, second, x as Char))
-            }
-        }
-        return evalStack.first()
     }
 
     fun onDrop(
@@ -272,162 +212,6 @@ class GameViewModel(
             )
         }
 
-    }
-
-    fun toInt(difficulty: Difficulty) : Int {
-        return when (difficulty) {
-            Difficulty.Easy -> 0
-            Difficulty.Medium -> 1
-            Difficulty.Hard -> 2
-        }
-    }
-
-    fun generateRandomDigits(r: Random, maskSize: Int) : String {
-        val s = StringBuilder()
-        repeat(maskSize) {
-            s.append('0' + r.nextInt(1, 10)) // '1' to '9' inclusive.. Avoid 0 intentionally
-        }
-        return s.toString()
-    }
-
-
-    fun generateTwoRandomOperators(r: Random) : String {
-        return when(r.nextInt(0, 6)) {
-            0 -> "+-"
-            1 -> "+*"
-            2 -> "-+"
-            3 -> "-*"
-            4 -> "*+"
-            else -> "*-"
-        }
-    }
-
-    fun generateTwoRandomOperatorsWithOneMultiply(r: Random) : String {
-        return when(r.nextInt(0, 4)) {
-            0 -> "+*"
-            1 -> "-*"
-            2 -> "*+"
-            else -> "*-"
-        }
-    }
-
-    fun insertOperators(s: String, positions: List<Int>, ops: String) : String {
-        val sb = StringBuilder()
-        var opsIdx = 0
-        for ((idx, char) in s.withIndex()) {
-            if (idx in positions) {
-                sb.append(ops[opsIdx])
-                opsIdx++
-            } else {
-                sb.append(char)
-            }
-        }
-        return sb.toString()
-    }
-
-    fun generatePuzzle(date: LocalDate, difficulty: Difficulty) : Puzzle {
-        val seed = 1000000 * date.year + 100 * date.dayOfYear + toInt(difficulty)
-        val seededRandom = Random(seed)
-        return when (difficulty) {
-            Difficulty.Easy -> generateEasyPuzzle(seededRandom)
-            Difficulty.Medium -> generateMediumPuzzle(seededRandom)
-            Difficulty.Hard -> generateHardPuzzle(seededRandom)
-        }
-    }
-
-    fun generateReserves(r: Random, s: String, initial: Char? = null) : String {
-        val sb = StringBuilder()
-        for (ch in s) {
-            if (ch.isDigit()) {
-                sb.append(ch)
-            }
-        }
-        if (initial != null) {
-            sb.append(initial)
-        }
-        sb.append(generateRandomDigits(r, 1))
-
-        val charArray = sb.toString().toCharArray()
-        charArray.sort()
-        sb.clear()
-        sb.append(charArray)
-        return sb.toString()
-    }
-
-    fun generateEasyPuzzle(r: Random) : Puzzle {
-        val s1 = generateRandomDigits(r, 4)
-        val positions = when (r.nextInt(0, 2)) {
-            0 -> listOf(1)
-            else -> listOf(2)
-        }
-        val ops = if (r.nextBoolean()) "+" else "-"
-        var s2 = insertOperators(s1, positions, ops)
-
-        var eval = evaluate(s2)
-        if (eval <= 0) {
-            s2 = s2.replace('-', '+')
-        }
-        eval = evaluate(s2)
-
-        return Puzzle(
-            lhs = Regex("\\d").replace(s2, UNKNOWN.toString()),
-            rhs = eval.toString(),
-            reserves = generateReserves(r, s2)
-        )
-    }
-
-    fun generateMediumPuzzle(r: Random) : Puzzle {
-        val s1 = generateRandomDigits(r, 6)
-        val positions = when (r.nextInt(0, 3)) {
-            0 -> listOf(1, 3)
-            1 -> listOf(2, 4)
-            else -> listOf(1, 4)
-        }
-        val ops = generateTwoRandomOperators(r)
-        var s2 = insertOperators(s1, positions, ops)
-
-        var eval = evaluate(s2)
-        if (eval <= 0) {
-            s2 = s2.replace('-', '+')
-        }
-        eval = evaluate(s2)
-
-        return Puzzle(
-            lhs = Regex("\\d").replace(s2, UNKNOWN.toString()),
-            rhs = eval.toString(),
-            reserves = generateReserves(r, s2)
-        )
-    }
-
-    fun generateHardPuzzle(r: Random) : Puzzle {
-        val s1 = generateRandomDigits(r, 6)
-        val positions = when (r.nextInt(0, 3)) {
-            0 -> listOf(1, 3)
-            1 -> listOf(2, 4)
-            else -> listOf(1, 4)
-        }
-        val ops = generateTwoRandomOperatorsWithOneMultiply(r)
-        var s2 = insertOperators(s1, positions, ops)
-
-        var eval = evaluate(s2)
-        if (eval < 0) {
-            s2 = s2.replace('-', '+')
-        }
-        eval = evaluate(s2)
-
-        val evalStr = eval.toString()
-        var evalIdx = r.nextInt(0, evalStr.length)
-        if (eval > 0) {
-            while (evalStr[evalIdx] == '0') {
-                evalIdx = (evalIdx + 1) % evalStr.length
-            }
-        }
-
-        return Puzzle(
-            lhs = Regex("\\d").replace(s2, UNKNOWN.toString()),
-            rhs = evalStr.substring(0, evalIdx) + UNKNOWN + evalStr.substring(evalIdx + 1),
-            reserves = generateReserves(r, s2, initial = evalStr[evalIdx])
-        )
     }
 
     fun generateEmptySubstitutions(expression: String) : String {
@@ -619,4 +403,225 @@ class GameViewModel(
             }
         }
     }
+}
+
+@VisibleForTesting
+internal fun generatePuzzle(date: LocalDate, difficulty: Difficulty) : Puzzle {
+    val seed = 1000000 * date.year + 100 * date.dayOfYear + toInt(difficulty)
+    val seededRandom = Random(seed)
+    return when (difficulty) {
+        Difficulty.Easy -> generateEasyPuzzle(seededRandom)
+        Difficulty.Medium -> generateMediumPuzzle(seededRandom)
+        Difficulty.Hard -> generateHardPuzzle(seededRandom)
+    }
+}
+
+fun generateEasyPuzzle(r: Random) : Puzzle {
+    val s1 = generateRandomDigits(r, 4)
+    val positions = when (r.nextInt(0, 2)) {
+        0 -> listOf(1)
+        else -> listOf(2)
+    }
+    val ops = if (r.nextBoolean()) "+" else "-"
+    var s2 = insertOperators(s1, positions, ops)
+
+    var eval = evaluate(s2)
+    if (eval <= 0) {
+        s2 = s2.replace('-', '+')
+    }
+    eval = evaluate(s2)
+
+    return Puzzle(
+        lhs = Regex("\\d").replace(s2, UNKNOWN.toString()),
+        rhs = eval.toString(),
+        reserves = generateReserves(r, s2)
+    )
+}
+
+fun generateMediumPuzzle(r: Random) : Puzzle {
+    val s1 = generateRandomDigits(r, 6)
+    val positions = when (r.nextInt(0, 3)) {
+        0 -> listOf(1, 3)
+        1 -> listOf(2, 4)
+        else -> listOf(1, 4)
+    }
+    val ops = generateTwoRandomOperators(r)
+    var s2 = insertOperators(s1, positions, ops)
+
+    var eval = evaluate(s2)
+    if (eval <= 0) {
+        s2 = s2.replace('-', '+')
+    }
+    eval = evaluate(s2)
+
+    return Puzzle(
+        lhs = Regex("\\d").replace(s2, UNKNOWN.toString()),
+        rhs = eval.toString(),
+        reserves = generateReserves(r, s2)
+    )
+}
+
+fun generateHardPuzzle(r: Random) : Puzzle {
+    val s1 = generateRandomDigits(r, 6)
+    val positions = when (r.nextInt(0, 3)) {
+        0 -> listOf(1, 3)
+        1 -> listOf(2, 4)
+        else -> listOf(1, 4)
+    }
+    val ops = generateTwoRandomOperatorsWithOneMultiply(r)
+    var s2 = insertOperators(s1, positions, ops)
+
+    var eval = evaluate(s2)
+    if (eval < 0) {
+        s2 = s2.replace('-', '+')
+    }
+    eval = evaluate(s2)
+
+    val evalStr = eval.toString()
+    var evalIdx = r.nextInt(0, evalStr.length)
+    if (eval > 0) {
+        while (evalStr[evalIdx] == '0') {
+            evalIdx = (evalIdx + 1) % evalStr.length
+        }
+    }
+
+    return Puzzle(
+        lhs = Regex("\\d").replace(s2, UNKNOWN.toString()),
+        rhs = evalStr.substring(0, evalIdx) + UNKNOWN + evalStr.substring(evalIdx + 1),
+        reserves = generateReserves(r, s2, initial = evalStr[evalIdx])
+    )
+}
+
+fun toInt(difficulty: Difficulty) : Int {
+    return when (difficulty) {
+        Difficulty.Easy -> 0
+        Difficulty.Medium -> 1
+        Difficulty.Hard -> 2
+    }
+}
+
+fun generateReserves(r: Random, s: String, initial: Char? = null) : String {
+    val sb = StringBuilder()
+    for (ch in s) {
+        if (ch.isDigit()) {
+            sb.append(ch)
+        }
+    }
+    if (initial != null) {
+        sb.append(initial)
+    }
+    sb.append(generateRandomDigits(r, 1))
+
+    val charArray = sb.toString().toCharArray()
+    charArray.sort()
+    sb.clear()
+    sb.append(charArray)
+    return sb.toString()
+}
+
+
+fun generateTwoRandomOperators(r: Random) : String {
+    return when(r.nextInt(0, 6)) {
+        0 -> "+-"
+        1 -> "+*"
+        2 -> "-+"
+        3 -> "-*"
+        4 -> "*+"
+        else -> "*-"
+    }
+}
+
+fun generateTwoRandomOperatorsWithOneMultiply(r: Random) : String {
+    return when(r.nextInt(0, 4)) {
+        0 -> "+*"
+        1 -> "-*"
+        2 -> "*+"
+        else -> "*-"
+    }
+}
+
+fun insertOperators(s: String, positions: List<Int>, ops: String) : String {
+    val sb = StringBuilder()
+    var opsIdx = 0
+    for ((idx, char) in s.withIndex()) {
+        if (idx in positions) {
+            sb.append(ops[opsIdx])
+            opsIdx++
+        } else {
+            sb.append(char)
+        }
+    }
+    return sb.toString()
+}
+
+fun generateRandomDigits(r: Random, maskSize: Int) : String {
+    val s = StringBuilder()
+    repeat(maskSize) {
+        s.append('0' + r.nextInt(1, 10)) // '1' to '9' inclusive.. Avoid 0 intentionally
+    }
+    return s.toString()
+}
+
+fun evaluate(expression: String) : Int {
+    val postfix : MutableList<Any> = mutableListOf()
+    val opStack = ArrayDeque<Char>()
+    var curr = 0
+    var hasDigit = false
+    for (ch in expression) {
+        if (ch.isDigit()) {
+            hasDigit = true
+            curr = 10 * curr + (ch - '0')
+        } else {
+            if (hasDigit) {
+                postfix.add(curr)
+            }
+            curr = 0
+            hasDigit = false
+            while (opStack.isNotEmpty() && precedence(ch) <= precedence(opStack.first())) {
+                postfix.add(opStack.removeFirst())
+            }
+            opStack.addFirst(ch)
+        }
+    }
+    if (hasDigit) {
+        postfix.add(curr)
+    }
+    while (opStack.isNotEmpty()) {
+        postfix.add(opStack.removeFirst())
+    }
+
+    val evalStack = ArrayDeque<Int>()
+    for (x in postfix) {
+        if (x is Int) {
+            evalStack.addFirst(x)
+        } else {
+            val second = evalStack.removeFirst()
+            val first = evalStack.removeFirst()
+            evalStack.addFirst(compute(first, second, x as Char))
+        }
+    }
+    return evalStack.first()
+}
+
+fun precedence(op: Char) : Int {
+    if (op == '+' || op == '-') {
+        return 0
+    }
+    if (op == '*') {
+        return 1
+    }
+    return 0
+}
+
+fun compute(a: Int, b: Int, op: Char) : Int {
+    if (op == '+') {
+        return a + b
+    }
+    if (op == '-') {
+        return a - b
+    }
+    if (op == '*') {
+        return a * b
+    }
+    return 0
 }

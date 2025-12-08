@@ -48,7 +48,7 @@ class SavedProgressRepository(
     val easyProgress: Flow<SavedProgress> = dataStore.data
         .catch {
             if (it is IOException) {
-                Log.e(TAG, "Error reading preferences", it)
+                Log.e(TAG, "Error reading preferences for easyProgress", it)
                 emit(emptyPreferences())
             } else {
                 throw it
@@ -70,7 +70,7 @@ class SavedProgressRepository(
     val mediumProgress: Flow<SavedProgress> = dataStore.data
         .catch {
             if (it is IOException) {
-                Log.e(TAG, "Error reading preferences", it)
+                Log.e(TAG, "Error reading preferences for mediumProgress", it)
                 emit(emptyPreferences())
             } else {
                 throw it
@@ -92,7 +92,7 @@ class SavedProgressRepository(
     val hardProgress: Flow<SavedProgress> = dataStore.data
         .catch {
             if (it is IOException) {
-                Log.e(TAG, "Error reading preferences", it)
+                Log.e(TAG, "Error reading preferences for hardProgress", it)
                 emit(emptyPreferences())
             } else {
                 throw it
